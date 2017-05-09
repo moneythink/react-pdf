@@ -70,7 +70,7 @@ var ReactPDF = function (_Component) {
   }, {
     key: 'shouldComponentUpdate',
     value: function shouldComponentUpdate(nextProps, nextState) {
-      return nextState.pdf !== this.state.pdf || nextState.page !== this.state.page || nextProps.width !== this.props.width || nextProps.scale !== this.props.scale;
+      return nextState.pdf !== this.state.pdf || nextState.page !== this.state.page || nextState.pages !== this.state.pages || nextProps.width !== this.props.width || nextProps.scale !== this.props.scale;
     }
 
     /**
@@ -99,8 +99,8 @@ var ReactPDF = function (_Component) {
 
   }, {
     key: 'getPageScale',
-    value: function getPageScale() {
-      var page = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.state.page;
+    value: function getPageScale(page) {
+      page = page || this.state.page;
       var _props = this.props,
           scale = _props.scale,
           width = _props.width;
@@ -111,7 +111,7 @@ var ReactPDF = function (_Component) {
 
       // If width is defined, calculate the scale of the page so it could be of desired width.
       if (width) {
-        pageScale = width / page.getViewport(scale).width;
+        pageScale = width / page.getViewport(scale, 0).width;
       }
 
       return scale * pageScale;
@@ -160,19 +160,13 @@ var ReactPDF = function (_Component) {
 
       // File is a File
       if (file instanceof File) {
-        var _ret2 = function () {
-          var reader = new FileReader();
+        var reader = new FileReader();
 
-          reader.onloadend = function () {
-            _this2.loadDocument(new Uint8Array(reader.result));
-          };
+        reader.onloadend = function () {
+          _this2.loadDocument(new Uint8Array(reader.result));
+        };
 
-          return {
-            v: reader.readAsArrayBuffer(file)
-          };
-        }();
-
-        if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
+        return reader.readAsArrayBuffer(file);
       }
 
       // File is an ArrayBuffer
@@ -256,12 +250,48 @@ var ReactPDF = function (_Component) {
   }, {
     key: 'render',
     value: function render() {
+      var pdf = this.state.pdf;
+
+      var areAllPagesLoaded = function areAllPagesLoaded(pages, numPages) {
+        if (pages.length == 0 || pages.length < numPages) {
+          return false;
+        }
+        for (var i = 0; i < pages.length; i++) {
+          if (pages[i] === undefined) {
+            return false;
+          }
+        }
+        return true;
+      };
+
+      if (this.props.renderSinglePage || pdf === false || pdf === null) {
+        return this.renderPage(this.state.page, this.props.pageIndex);
+      }
+
+      var pages = this.state.pages;
+
+      if (!areAllPagesLoaded(pages, pdf.numPages)) {
+        return this.renderLoader();
+      }
+
+      var pageDisplays = [];
+      for (var i = 0; i < pages.length; i++) {
+        pageDisplays.push(this.renderPage(pages[i], i));
+      }
+
+      return _react2.default.createElement(
+        'div',
+        null,
+        pageDisplays
+      );
+    }
+  }, {
+    key: 'renderPage',
+    value: function renderPage(page, pageIndex) {
       var _this3 = this;
 
       var file = this.props.file;
-      var _state = this.state,
-          pdf = _state.pdf,
-          page = _state.page;
+      var pdf = this.state.pdf;
 
 
       if (!file) {
@@ -277,13 +307,14 @@ var ReactPDF = function (_Component) {
       }
 
       return _react2.default.createElement('canvas', {
+        key: 'pdf-page-' + pageIndex,
         ref: function ref(_ref2) {
           if (!_ref2) return;
 
           var canvas = _ref2;
 
           var pixelRatio = window.devicePixelRatio || 1;
-          var viewport = page.getViewport(_this3.getPageScale() * pixelRatio);
+          var viewport = page.getViewport(_this3.getPageScale(page) * pixelRatio, 0);
 
           canvas.height = viewport.height;
           canvas.width = viewport.width;
@@ -307,7 +338,7 @@ var ReactPDF = function (_Component) {
 
           _this3.renderer = page.render(renderContext);
 
-          _this3.renderer.then(_this3.onPageRender).catch(function (dismiss) {
+          _this3.renderer.then(_this3.onPageRender.bind(_this3, pageIndex)).catch(function (dismiss) {
             if (dismiss === 'cancelled') {
               // Everything's alright
               return;
@@ -328,7 +359,8 @@ var _initialiseProps = function _initialiseProps() {
 
   this.state = {
     pdf: null,
-    page: null
+    page: null,
+    pages: []
   };
 
   this.onDocumentLoad = function (pdf) {
@@ -336,9 +368,17 @@ var _initialiseProps = function _initialiseProps() {
       total: pdf.numPages
     });
 
-    _this4.setState({ pdf: pdf });
-
-    _this4.loadPage(_this4.props.pageIndex);
+    if (_this4.props.renderSinglePage) {
+      _this4.setState({ pdf: pdf }, function () {
+        _this4.loadPage(_this4.props.pageIndex);
+      });
+    } else {
+      _this4.setState({ pdf: pdf, pages: new Array(pdf.numPages) }, function () {
+        for (var i = 0; i < pdf.numPages; i++) {
+          _this4.loadPage(i);
+        }
+      });
+    }
   };
 
   this.onDocumentError = function (error) {
@@ -348,33 +388,42 @@ var _initialiseProps = function _initialiseProps() {
   };
 
   this.onPageLoad = function (page) {
-    var scale = _this4.getPageScale(page);
-
-    _this4.callIfDefined(_this4.props.onPageLoad, {
-      pageIndex: page.pageIndex,
-      pageNumber: page.pageNumber,
-      get width() {
-        return page.view[2] * scale;
-      },
-      get height() {
-        return page.view[3] * scale;
-      },
-      scale: scale,
-      get originalWidth() {
-        return page.view[2];
-      },
-      get originalHeight() {
-        return page.view[3];
-      }
-    });
-
-    _this4.setState({ page: page });
+    if (_this4.props.renderSinglePage) {
+      _this4.setState({ page: page }, function () {
+        var scale = _this4.getPageScale(page);
+        _this4.callIfDefined(_this4.props.onPageLoad, {
+          pageIndex: page.pageIndex,
+          pageNumber: page.pageNumber,
+          get width() {
+            return page.view[2] * scale;
+          },
+          get height() {
+            return page.view[3] * scale;
+          },
+          scale: scale,
+          get originalWidth() {
+            return page.view[2];
+          },
+          get originalHeight() {
+            return page.view[3];
+          }
+        });
+      });
+    } else {
+      var pages = Object.assign([], _this4.state.pages);
+      pages[page.pageIndex] = page;
+      _this4.setState({ pages: pages }, function () {
+        _this4.callIfDefined(_this4.props.onPageLoad, { pageNumber: page.pageNumber, 'etc': 'of ' + _this4.state.pdf.numPages });
+      });
+    }
   };
 
-  this.onPageRender = function () {
+  this.onPageRender = function (pageIndex) {
     _this4.renderer = null;
 
-    _this4.callIfDefined(_this4.props.onPageRender);
+    var pageNumber = pageIndex + 1;
+    var totalPages = _this4.state.pdf.numPages;
+    _this4.callIfDefined(_this4.props.onPageRender, { pageNumber: pageNumber, totalPages: totalPages });
   };
 
   this.onPageError = function (error) {
@@ -432,7 +481,8 @@ ReactPDF.defaultProps = {
   scale: 1.0,
   error: 'Failed to load PDF file.',
   loading: 'Loading PDF…',
-  noData: 'No PDF file specified.'
+  noData: 'No PDF file specified.',
+  renderSinglePage: true
 };
 
 ReactPDF.propTypes = {
@@ -452,5 +502,6 @@ ReactPDF.propTypes = {
   onPageRender: _react.PropTypes.func,
   pageIndex: _react.PropTypes.number,
   scale: _react.PropTypes.number,
-  width: _react.PropTypes.number
+  width: _react.PropTypes.number,
+  renderSinglePage: _react.PropTypes.bool
 };

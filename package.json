@@ -5,7 +5,7 @@
   "main": "es5/react-pdf.js",
   "es6": "src/react-pdf.jsx",
   "scripts": {
-    "build": "npm run build-sample && npm run build-source && npm run build-test",
+    "build": "npm run build-source",
     "build-sample": "webpack --config webpack.config.sample.js",
     "build-source": "babel src -d es5",
     "build-test": "webpack --config webpack.config.test.js",
