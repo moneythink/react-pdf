@@ -381,6 +381,9 @@ export default class ReactPDF extends Component {
 
           canvas.style.height = `${viewport.height / pixelRatio}px`;
           canvas.style.width = `${viewport.width / pixelRatio}px`;
+          if (!this.props.renderSinglePage) {
+            canvas.style.display = 'block';
+          }
 
           const canvasContext = canvas.getContext('2d');
 

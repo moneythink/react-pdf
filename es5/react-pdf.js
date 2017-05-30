@@ -321,6 +321,9 @@ var ReactPDF = function (_Component) {
 
           canvas.style.height = viewport.height / pixelRatio + 'px';
           canvas.style.width = viewport.width / pixelRatio + 'px';
+          if (!_this3.props.renderSinglePage) {
+            canvas.style.display = 'block';
+          }
 
           var canvasContext = canvas.getContext('2d');
 
