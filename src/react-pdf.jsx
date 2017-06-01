@@ -150,9 +150,9 @@ export default class ReactPDF extends Component {
     let pageScale = 1;
 
     // If width is defined, calculate the scale of the page so it could be of desired width.
-    if (width) {
-      pageScale = width / page.getViewport(scale, 0).width;
-    }
+    // if (width) {
+    //   pageScale = width / page.getViewport(scale, 0).width;
+    // }
 
     return scale * pageScale;
   }
@@ -373,7 +373,7 @@ export default class ReactPDF extends Component {
 
           const canvas = ref;
 
-          const pixelRatio = window.devicePixelRatio || 1;
+          const pixelRatio = /*window.devicePixelRatio || */1;
           const viewport = page.getViewport(this.getPageScale(page) * pixelRatio, 0);
 
           canvas.height = viewport.height;
